@@ -1,0 +1,24 @@
+# Environments
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+# The HTML export is a build artifact — regenerate it with:
+#   jupyter nbconvert --to html notebooks/vol_forecaster.ipynb
+notebooks/*.html
+
+# OS
+.DS_Store

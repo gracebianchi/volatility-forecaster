@@ -1,0 +1,40 @@
+name: Deploy dashboard
+
+# The daily forecast workflow publishes Pages itself after each run. This one
+# covers the other case: a human editing the dashboard and pushing. (It cannot
+# cover the daily run — a push made with GITHUB_TOKEN does not trigger
+# workflows, which is exactly why the daily job deploys inline.)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

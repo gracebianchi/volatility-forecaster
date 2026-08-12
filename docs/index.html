@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPY Volatility Regime Monitor</title>
+<meta name="description" content="Daily Markov regime-switching volatility forecast for SPY, with regime probabilities, a Monte Carlo forecast cone, and EVT tail risk.">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border:    #e2e1dc;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #7a7873;
+
+    /* Two-series categorical: realized vs forecast. Validated adjacent-pair
+       CVD dE 24.7 / normal-vision 33.6, both above 3:1 on this surface. */
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+
+    /* Regime ladder: an ordinal one-hue ramp, light -> dark with severity.
+       Validated monotone, dL 0.14 per step, light end 2.06:1. */
+    --regime-1: #86b6ef;
+    --regime-2: #3987e5;
+    --regime-3: #1c5cab;
+    --regime-4: #0d366b;
+
+    --grid: #e8e7e3;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #111110;
+      --surface-1: #1a1a19;
+      --border:    #2e2e2b;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #918f86;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --regime-1: #184f95;
+      --regime-2: #2a78d6;
+      --regime-3: #6da7ec;
+      --regime-4: #b7d3f6;
+      --grid: #2a2a27;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --border:    #2e2e2b;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #918f86;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --regime-1: #184f95;
+    --regime-2: #2a78d6;
+    --regime-3: #6da7ec;
+    --regime-4: #b7d3f6;
+    --grid: #2a2a27;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 15px/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  header { margin-bottom: 28px; }
+  h1 { font-size: 1.6rem; letter-spacing: -.02em; margin: 0 0 6px; }
+  .sub { color: var(--text-secondary); font-size: .9rem; margin: 0; }
+  .sub code { font-size: .85em; color: var(--text-muted); }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: .78rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--text-muted); margin: 0 0 4px; font-weight: 600;
+  }
+  .card .note { color: var(--text-secondary); font-size: .85rem; margin: 0 0 16px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .tile .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); font-weight: 600; }
+  .tile .value { font-size: 1.9rem; font-weight: 650; letter-spacing: -.02em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .tile .foot { font-size: .8rem; color: var(--text-secondary); margin-top: 2px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: baseline; }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .scroll { overflow-x: auto; }
+  .axis text { fill: var(--text-muted); font-size: 11px; }
+  .axis line, .axis path { stroke: var(--grid); }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; font-size: .84rem; color: var(--text-secondary); }
+  .legend span.key { display: inline-flex; align-items: center; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .86rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }
+
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: .84rem; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 11px; font-size: .8rem; box-shadow: var(--shadow); z-index: 20;
+    font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-primary);
+  }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 14px; }
+  .tooltip .t-head { color: var(--text-muted); font-size: .74rem; margin-bottom: 4px; }
+
+  footer { color: var(--text-muted); font-size: .8rem; margin-top: 36px; line-height: 1.7; }
+  footer a { color: var(--text-secondary); }
+  .err { color: var(--series-2); font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SPY Volatility Regime Monitor</h1>
+    <p class="sub" id="asof">Loading…</p>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <h2>Regime probabilities — next session</h2>
+    <p class="note">Where the hidden Markov model believes the market will sit tomorrow, using only data through the close shown above.</p>
+    <div id="regime-bars"></div>
+  </section>
+
+  <section class="card">
+    <h2>10-day forecast cone</h2>
+    <p class="note">3,000 Monte Carlo paths through the regime chain. The cone is right-skewed because some paths escalate into stress; a single-regime model produces a symmetric band by construction.</p>
+    <div class="legend" id="fan-legend"></div>
+    <div class="scroll"><div id="fan"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Forecast vs. realized</h2>
+    <p class="note">Each point is a forecast made the previous session, scored against the realized volatility that followed.</p>
+    <div class="legend" id="hist-legend"></div>
+    <div class="scroll"><div id="history"></div></div>
+    <details>
+      <summary>View as table</summary>
+      <div class="scroll" id="history-table"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Stress index</h2>
+    <p class="note">Severity-weighted regime probability, 0 (fully calm) to 1 (fully panicked).</p>
+    <div class="scroll"><div id="stress"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Live scorecard</h2>
+    <p class="note">Performance on forecasts actually made in production — not the 2023–2026 backtest.</p>
+    <div id="scorecard"></div>
+  </section>
+
+  <footer>
+    <p>
+      Regime-switching HAR with a Gaussian hidden Markov model and a generalized Pareto tail.
+      Rebuilt each weekday after the US close by GitHub Actions.
+      <a href="https://github.com/gracebianchi/vol-forecaster">Source and methodology</a>.
+    </p>
+    <p>Research project. Not investment advice.</p>
+  </footer>
+</div>
+
+<div class="tooltip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+const REGIMES = ["Calm", "Normal", "Stressed", "Panic"];
+const REGIME_VAR = ["--regime-1", "--regime-2", "--regime-3", "--regime-4"];
+const tip = document.getElementById("tip");
+const fmtPct = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : v.toFixed(d) + "%";
+const fmtNum = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : v.toFixed(d);
+
+/** Round an axis range out to human-readable tick values (1/2/5 x 10^n). */
+function niceTicks(lo, hi, target = 5) {
+  const span = hi - lo || 1;
+  const raw = span / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].find(m => m * mag >= raw) * mag;
+  // The first tick must sit at or below the data minimum and the last at or
+  // above the maximum — they define the axis bounds, so dropping one to tidy
+  // the labels would clip the marks it was meant to contain.
+  const ticks = [];
+  for (let v = Math.floor(lo / step) * step; v < hi + step * 0.999; v += step) {
+    ticks.push(Math.abs(v) < step / 1e6 ? 0 : +v.toFixed(6));
+  }
+  return { ticks, min: ticks[0], max: ticks[ticks.length - 1] };
+}
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  for (const c of [].concat(children)) node.append(c);
+  return node;
+}
+
+function showTip(html, evt) {
+  tip.innerHTML = html;
+  tip.style.opacity = "1";
+  const pad = 14;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - pad;
+  tip.style.left = x + "px";
+  tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.opacity = "0"; };
+
+/* ---------------------------------------------------------------- tiles */
+function renderTiles(fc) {
+  const idx = REGIMES.indexOf(fc.regime_today);
+  const color = `var(${REGIME_VAR[idx < 0 ? 1 : idx]})`;
+  const tiles = [
+    {
+      label: "Regime today",
+      value: `<span class="swatch" style="background:${color}"></span>${fc.regime_today}`,
+      foot: `${(Math.max(...Object.values(fc.regime_probs_today)) * 100).toFixed(0)}% confidence`,
+    },
+    {
+      label: "Stress index",
+      value: fc.stress_index.toFixed(2),
+      foot: "0 = calm · 1 = panic",
+    },
+    {
+      label: "Forecast volatility",
+      value: fmtPct(fc.forecast_rv, 1),
+      foot: `annualized · realized ${fmtPct(fc.realized_vol, 1)}`,
+    },
+    {
+      label: "1-day VaR (99%)",
+      value: fmtPct(fc.risk["99"].var * 100, 2),
+      foot: `expected shortfall ${fmtPct(fc.risk["99"].es * 100, 2)}`,
+    },
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(t => `
+    <div class="tile">
+      <div class="label">${t.label}</div>
+      <div class="value">${t.value}</div>
+      <div class="foot">${t.foot}</div>
+    </div>`).join("");
+}
+
+/* ------------------------------------------------------- regime bar chart */
+function renderRegimeBars(fc) {
+  const probs = fc.regime_probs_tomorrow;
+  const W = 720, rowH = 42, H = REGIMES.length * rowH + 8;
+  const labelW = 82, valueW = 58;
+  const trackW = W - labelW - valueW;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+                          "aria-label": "Regime probabilities for the next session" });
+
+  REGIMES.forEach((name, i) => {
+    const p = probs[name] ?? 0;
+    const y = i * rowH + 4;
+    const barH = 22;
+    // A floor keeps a near-zero probability visible as a mark rather than vanishing.
+    const w = Math.max(p * trackW, p > 0.0005 ? 3 : 0);
+
+    svg.append(el("text", { x: 0, y: y + barH / 2 + 4, fill: "var(--text-secondary)",
+                            "font-size": 13 }, document.createTextNode(name)));
+    svg.append(el("rect", { x: labelW, y, width: trackW, height: barH, rx: 4,
+                            fill: "var(--grid)" }));
+    if (w > 0) {
+      svg.append(el("rect", { x: labelW, y, width: w, height: barH, rx: 4,
+                              fill: `var(${REGIME_VAR[i]})` }));
+    }
+    svg.append(el("text", { x: labelW + trackW + 10, y: y + barH / 2 + 4,
+                            fill: "var(--text-primary)", "font-size": 13,
+                            "font-variant-numeric": "tabular-nums" },
+                  document.createTextNode((p * 100).toFixed(1) + "%")));
+
+    const hit = el("rect", { x: 0, y: y - 4, width: W, height: rowH, fill: "transparent" });
+    hit.addEventListener("mousemove", (e) => showTip(
+      `<div class="t-head">${name}</div>
+       <div class="t-row"><span>Tomorrow</span><b>${(p * 100).toFixed(1)}%</b></div>
+       <div class="t-row"><span>Today</span><b>${((fc.regime_probs_today[name] ?? 0) * 100).toFixed(1)}%</b></div>`, e));
+    hit.addEventListener("mouseleave", hideTip);
+    svg.append(hit);
+  });
+
+  document.getElementById("regime-bars").replaceChildren(svg);
+}
+
+/* ------------------------------------------------------------- fan chart */
+function renderFan(fc) {
+  const f = fc.fan, days = f.days_ahead;
+  const W = 720, H = 320, m = { t: 12, r: 16, b: 34, l: 46 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const scale = niceTicks(Math.max(0, Math.min(...f.p5, fc.realized_vol)), Math.max(...f.p95));
+  const yMin = scale.min, yMax = scale.max;
+  const x = (i) => m.l + (iw * i) / (days.length - 1);
+  const y = (v) => m.t + ih - (ih * (v - yMin)) / (yMax - yMin);
+
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+                          "aria-label": "Ten-day volatility forecast cone" });
+
+  for (const v of scale.ticks) {
+    svg.append(el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: "gridline" }));
+    svg.append(el("text", { x: m.l - 9, y: y(v) + 4, "text-anchor": "end",
+                            fill: "var(--text-muted)", "font-size": 11 },
+                  document.createTextNode(v + "%")));
+  }
+
+  // Nested bands cannot take the usual 2px surface gap, so the inner band is
+  // separated by a clear opacity step plus a hairline edge instead.
+  const band = (loArr, hiArr, opacity, edge) => {
+    const up = loArr.map((v, i) => `${x(i)},${y(v)}`).join(" L ");
+    const down = hiArr.map((v, i) => `${x(i)},${y(v)}`).reverse().join(" L ");
+    return el("path", {
+      d: `M ${up} L ${down} Z`, fill: "var(--series-1)", "fill-opacity": opacity,
+      stroke: edge ? "var(--series-1)" : "none",
+      "stroke-width": edge ? 1 : 0, "stroke-opacity": edge ? 0.55 : 0,
+    });
+  };
+  svg.append(band(f.p5, f.p95, 0.13, false));
+  svg.append(band(f.p25, f.p75, 0.34, true));
+
+  svg.append(el("path", {
+    d: "M " + f.p50.map((v, i) => `${x(i)},${y(v)}`).join(" L "),
+    fill: "none", stroke: "var(--series-1)", "stroke-width": 2,
+    "stroke-linejoin": "round", "stroke-linecap": "round",
+  }));
+
+  svg.append(el("line", {
+    x1: m.l, x2: W - m.r, y1: y(fc.realized_vol), y2: y(fc.realized_vol),
+    stroke: "var(--text-muted)", "stroke-width": 1.5, "stroke-dasharray": "5 4",
+  }));
+  svg.append(el("text", { x: W - m.r, y: y(fc.realized_vol) - 7, "text-anchor": "end",
+                          fill: "var(--text-muted)", "font-size": 11 },
+                document.createTextNode(`today ${fc.realized_vol.toFixed(1)}%`)));
+
+  days.forEach((d, i) => {
+    svg.append(el("text", { x: x(i), y: H - 12, "text-anchor": "middle",
+                            fill: "var(--text-muted)", "font-size": 11 },
+                  document.createTextNode("+" + d)));
+  });
+
+  const cursor = el("line", { y1: m.t, y2: m.t + ih, stroke: "var(--text-muted)",
+                              "stroke-width": 1, opacity: 0 });
+  svg.append(cursor);
+  const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+  hit.addEventListener("mousemove", (e) => {
+    const box = svg.getBoundingClientRect();
+    const rel = ((e.clientX - box.left) / box.width) * W;
+    const i = Math.max(0, Math.min(days.length - 1, Math.round(((rel - m.l) / iw) * (days.length - 1))));
+    cursor.setAttribute("x1", x(i)); cursor.setAttribute("x2", x(i));
+    cursor.setAttribute("opacity", 0.5);
+    showTip(
+      `<div class="t-head">${days[i]} trading day${days[i] > 1 ? "s" : ""} ahead</div>
+       <div class="t-row"><span>95th</span><b>${fmtPct(f.p95[i], 1)}</b></div>
+       <div class="t-row"><span>75th</span><b>${fmtPct(f.p75[i], 1)}</b></div>
+       <div class="t-row"><span>Median</span><b>${fmtPct(f.p50[i], 1)}</b></div>
+       <div class="t-row"><span>25th</span><b>${fmtPct(f.p25[i], 1)}</b></div>
+       <div class="t-row"><span>5th</span><b>${fmtPct(f.p5[i], 1)}</b></div>`, e);
+  });
+  hit.addEventListener("mouseleave", () => { cursor.setAttribute("opacity", 0); hideTip(); });
+  svg.append(hit);
+
+  document.getElementById("fan-legend").innerHTML = `
+    <span class="key"><span class="swatch" style="background:var(--series-1)"></span>Median</span>
+    <span class="key"><span class="swatch" style="background:var(--series-1);opacity:.5;outline:1px solid var(--series-1)"></span>25–75%</span>
+    <span class="key"><span class="swatch" style="background:var(--series-1);opacity:.18"></span>5–95%</span>`;
+  document.getElementById("fan").replaceChildren(svg);
+}
+
+/* --------------------------------------------------------- history chart */
+function lineChart(container, rows, series, opts) {
+  const W = 720, H = opts.height ?? 280, m = { t: 12, r: 16, b: 32, l: 46 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const all = series.flatMap(s => rows.map(r => r[s.key])).filter(v => v != null && !Number.isNaN(v));
+  if (!all.length) { container.innerHTML = '<p class="note">Not enough data yet.</p>'; return; }
+  const scale = niceTicks(opts.yMin ?? Math.max(0, Math.min(...all)),
+                          opts.yMax ?? Math.max(...all), 4);
+  const yMin = opts.yMin ?? scale.min, yMax = opts.yMax ?? scale.max;
+
+  const x = (i) => m.l + (rows.length === 1 ? iw / 2 : (iw * i) / (rows.length - 1));
+  const y = (v) => m.t + ih - (ih * (v - yMin)) / (yMax - yMin);
+
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.label });
+
+  for (const v of scale.ticks) {
+    if (v < yMin || v > yMax) continue;
+    svg.append(el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: "gridline" }));
+    svg.append(el("text", { x: m.l - 9, y: y(v) + 4, "text-anchor": "end",
+                            fill: "var(--text-muted)", "font-size": 11 },
+                  document.createTextNode(opts.fmtAxis ? opts.fmtAxis(v) : String(v))));
+  }
+
+  for (const s of series) {
+    if (s.area) {
+      const pts = rows.map((r, i) => `${x(i)},${y(r[s.key] ?? yMin)}`).join(" L ");
+      svg.append(el("path", {
+        d: `M ${m.l},${y(yMin)} L ${pts} L ${x(rows.length - 1)},${y(yMin)} Z`,
+        fill: s.color, "fill-opacity": 0.18, stroke: "none",
+      }));
+    }
+    // Break the path across gaps so unresolved days are absent, not interpolated.
+    let d = "", pen = false;
+    rows.forEach((r, i) => {
+      const v = r[s.key];
+      if (v == null || Number.isNaN(v)) { pen = false; return; }
+      d += `${pen ? " L " : " M "}${x(i)},${y(v)}`;
+      pen = true;
+    });
+    svg.append(el("path", { d, fill: "none", stroke: s.color, "stroke-width": 2,
+                            "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  }
+
+  const step = Math.max(1, Math.ceil(rows.length / 6));
+  rows.forEach((r, i) => {
+    if (i % step === 0 || i === rows.length - 1) {
+      svg.append(el("text", { x: x(i), y: H - 10, "text-anchor": "middle",
+                              fill: "var(--text-muted)", "font-size": 11 },
+                    document.createTextNode(r.as_of.slice(5))));
+    }
+  });
+
+  const cursor = el("line", { y1: m.t, y2: m.t + ih, stroke: "var(--text-muted)",
+                              "stroke-width": 1, opacity: 0 });
+  svg.append(cursor);
+  const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+  hit.addEventListener("mousemove", (e) => {
+    const box = svg.getBoundingClientRect();
+    const rel = ((e.clientX - box.left) / box.width) * W;
+    const i = Math.max(0, Math.min(rows.length - 1, Math.round(((rel - m.l) / iw) * (rows.length - 1))));
+    cursor.setAttribute("x1", x(i)); cursor.setAttribute("x2", x(i));
+    cursor.setAttribute("opacity", 0.5);
+    const body = series.map(s => `
+      <div class="t-row"><span><span class="swatch" style="background:${s.color}"></span>${s.name}</span>
+      <b>${opts.fmtTip ? opts.fmtTip(rows[i][s.key]) : fmtNum(rows[i][s.key])}</b></div>`).join("");
+    showTip(`<div class="t-head">${rows[i].as_of}</div>${body}`, e);
+  });
+  hit.addEventListener("mouseleave", () => { cursor.setAttribute("opacity", 0); hideTip(); });
+  svg.append(hit);
+
+  container.replaceChildren(svg);
+}
+
+function renderHistory(history) {
+  const rows = history.slice(-120);
+  const container = document.getElementById("history");
+
+  if (rows.length < 2) {
+    container.innerHTML = '<p class="note">The forecast history starts building from the first scheduled run — check back after a few sessions.</p>';
+    document.getElementById("hist-legend").innerHTML = "";
+  } else {
+    document.getElementById("hist-legend").innerHTML = `
+      <span class="key"><span class="swatch" style="background:var(--series-1)"></span>Realized</span>
+      <span class="key"><span class="swatch" style="background:var(--series-2)"></span>Forecast (MS-HAR)</span>`;
+    lineChart(container, rows, [
+      { key: "realized_rv", name: "Realized", color: "var(--series-1)" },
+      { key: "forecast_rv", name: "Forecast", color: "var(--series-2)" },
+    ], { label: "Forecast versus realized volatility",
+         fmtAxis: v => v.toFixed(0) + "%", fmtTip: v => fmtPct(v, 1) });
+  }
+
+  const stress = document.getElementById("stress");
+  if (rows.length < 2) {
+    stress.innerHTML = '<p class="note">Not enough history yet.</p>';
+  } else {
+    lineChart(stress, rows, [
+      { key: "stress_index", name: "Stress index", color: "var(--series-1)", area: true },
+    ], { label: "Stress index over time", height: 200, yMin: 0, yMax: 1,
+         fmtAxis: v => v.toFixed(2), fmtTip: v => fmtNum(v, 2) });
+  }
+
+  const recent = history.slice(-30).reverse();
+  document.getElementById("history-table").innerHTML = `
+    <table>
+      <thead><tr><th>Date</th><th>Regime</th><th>Stress</th><th>Forecast</th><th>Realized</th><th>VaR 99%</th><th>Breach</th></tr></thead>
+      <tbody>${recent.map(r => `
+        <tr>
+          <td>${r.as_of}</td><td>${r.regime ?? "–"}</td>
+          <td>${fmtNum(r.stress_index)}</td>
+          <td>${fmtPct(r.forecast_rv, 1)}</td>
+          <td>${r.realized_rv == null ? "pending" : fmtPct(r.realized_rv, 1)}</td>
+          <td>${r.var99 == null ? "–" : fmtPct(r.var99 * 100, 2)}</td>
+          <td>${r.breach99 == null ? "–" : (r.breach99 ? "yes" : "no")}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderScorecard(score) {
+  const box = document.getElementById("scorecard");
+  if (!score || !score.n) {
+    box.innerHTML = '<p class="note">No forecast has been scored yet. Each run fills in the outcome of the previous session.</p>';
+    return;
+  }
+  box.innerHTML = `
+    <table>
+      <tbody>
+        <tr><td>Forecasts scored</td><td>${score.n}</td></tr>
+        <tr><td>RMSE — MS-HAR</td><td>${fmtNum(score.rmse_ms_har)}</td></tr>
+        <tr><td>RMSE — single-regime HAR</td><td>${fmtNum(score.rmse_single_har)}</td></tr>
+        <tr><td>Mean bias — MS-HAR</td><td>${fmtNum(score.bias_ms_har)}</td></tr>
+        <tr><td>99% VaR breaches</td><td>${score.breaches_99} observed vs ${score.expected_breaches_99} expected</td></tr>
+      </tbody>
+    </table>`;
+}
+
+/* ------------------------------------------------------------------ boot */
+(async function () {
+  try {
+    const [fc, history] = await Promise.all([
+      fetch("./data/latest.json").then(r => r.json()),
+      fetch("./data/history.json").then(r => r.json()).catch(() => []),
+    ]);
+
+    document.getElementById("asof").innerHTML =
+      `Data through <b>${fc.as_of}</b> · model trained through ${fc.trained_through} · generated ${fc.generated_at}`;
+
+    renderTiles(fc);
+    renderRegimeBars(fc);
+    renderFan(fc);
+    renderHistory(history);
+    renderScorecard(fc.scorecard);
+  } catch (err) {
+    document.getElementById("asof").innerHTML =
+      `<span class="err">Could not load forecast data (${err.message}). If this is a fresh deployment, the first scheduled run has not completed yet.</span>`;
+  }
+})();
+</script>
+</body>
+</html>
