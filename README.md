@@ -152,8 +152,4 @@ rather than a jointly estimated one. And the whole thing is single-asset: a mult
 detector fed cross-asset correlations and credit spreads could separate systemic from
 idiosyncratic stress in a way this cannot.
 
-## License
 
-MIT — see [LICENSE](LICENSE).
-
-Research project. Not investment advice.
