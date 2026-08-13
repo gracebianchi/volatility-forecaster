@@ -7,7 +7,7 @@ This repository answers that question twice: once as a **research notebook** pin
 to a frozen sample, and once as a **live forecaster** that reruns every weekday after
 the US close and publishes its results.
 
-📈 **[Live dashboard](https://gracebianchi.github.io/vol-forecaster/)** — current
+📈 **[Live dashboard](https://gracebianchi.github.io/volatility-forecaster/)** — current
 regime, stress index, 10-day forecast cone, and EVT tail risk.
 
 📓 **[Research notebook](notebooks/vol_forecaster.ipynb)** — the full study.
