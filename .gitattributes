@@ -1,0 +1,4 @@
+*.ipynb linguist-language=Python
+*.joblib linguist-detectable=false
+*.json linguist-detectable=false
+*.csv linguist-detectable=false
