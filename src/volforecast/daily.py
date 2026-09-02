@@ -26,6 +26,7 @@ from .pipeline import VolForecaster, fit_forecaster, forecast_next_day
 
 HISTORY_COLUMNS = [
     "as_of",
+    "target_date",
     "forecast_rv",
     "forecast_rv_single_har",
     "daily_sigma",
@@ -140,6 +141,7 @@ def backfill_outcomes(
             continue  # the forecast day has not happened yet
 
         target = future[0]
+        history.at[i, "target_date"] = target.strftime("%Y-%m-%d")
         history.at[i, "realized_rv"] = float(rv.loc[target])
         if target in returns.index:
             r = float(returns.loc[target])
