@@ -26,7 +26,7 @@ from .pipeline import VolForecaster, fit_forecaster, forecast_next_day
 
 HISTORY_COLUMNS = [
     "as_of",
-    "target_date",
+    "target_date", 
     "forecast_rv",
     "forecast_rv_single_har",
     "daily_sigma",
