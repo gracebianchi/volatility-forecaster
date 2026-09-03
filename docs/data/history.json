@@ -1,6 +1,7 @@
 [
   {
     "as_of": "2026-08-11",
+    "target_date": null,
     "forecast_rv": 7.483998055504607,
     "forecast_rv_single_har": 6.755796391318458,
     "daily_sigma": 0.0047144756350848,
@@ -22,6 +23,7 @@
   },
   {
     "as_of": "2026-08-13",
+    "target_date": null,
     "forecast_rv": 7.08640790890871,
     "forecast_rv_single_har": 6.922572660393263,
     "daily_sigma": 0.0044640173846985,
@@ -43,6 +45,7 @@
   },
   {
     "as_of": "2026-08-14",
+    "target_date": null,
     "forecast_rv": 5.923750412375509,
     "forecast_rv_single_har": 5.775534864870672,
     "daily_sigma": 0.0037316120047528,
@@ -64,6 +67,7 @@
   },
   {
     "as_of": "2026-08-17",
+    "target_date": null,
     "forecast_rv": 5.71287716180413,
     "forecast_rv_single_har": 5.798220196167058,
     "daily_sigma": 0.0035987743430462,
@@ -85,6 +89,7 @@
   },
   {
     "as_of": "2026-08-18",
+    "target_date": null,
     "forecast_rv": 5.53375979782322,
     "forecast_rv_single_har": 5.242080151283006,
     "daily_sigma": 0.0034859410095731,
@@ -106,6 +111,7 @@
   },
   {
     "as_of": "2026-08-19",
+    "target_date": null,
     "forecast_rv": 5.974288677505869,
     "forecast_rv_single_har": 6.372806066252215,
     "daily_sigma": 0.0037634481193308,
@@ -127,6 +133,7 @@
   },
   {
     "as_of": "2026-08-20",
+    "target_date": null,
     "forecast_rv": 6.723951885731125,
     "forecast_rv_single_har": 7.107113502773386,
     "daily_sigma": 0.0042356915517162,
@@ -148,6 +155,7 @@
   },
   {
     "as_of": "2026-08-21",
+    "target_date": null,
     "forecast_rv": 6.283814935179506,
     "forecast_rv_single_har": 6.320312222410109,
     "daily_sigma": 0.0039584313341043,
@@ -169,6 +177,7 @@
   },
   {
     "as_of": "2026-08-24",
+    "target_date": null,
     "forecast_rv": 5.715857450648283,
     "forecast_rv_single_har": 5.893917466454259,
     "daily_sigma": 0.0036006517485502,
@@ -190,6 +199,7 @@
   },
   {
     "as_of": "2026-08-25",
+    "target_date": null,
     "forecast_rv": 5.819304634875872,
     "forecast_rv_single_har": 6.475094797923624,
     "daily_sigma": 0.003665817349335,
@@ -211,6 +221,7 @@
   },
   {
     "as_of": "2026-08-26",
+    "target_date": null,
     "forecast_rv": 5.6294113532766445,
     "forecast_rv_single_har": 6.04159863631928,
     "daily_sigma": 0.0035461958258222,
@@ -232,6 +243,7 @@
   },
   {
     "as_of": "2026-08-27",
+    "target_date": null,
     "forecast_rv": 6.183289589567958,
     "forecast_rv_single_har": 6.718335425686995,
     "daily_sigma": 0.0038951063186408,
@@ -253,6 +265,7 @@
   },
   {
     "as_of": "2026-08-28",
+    "target_date": null,
     "forecast_rv": 7.577115590871982,
     "forecast_rv_single_har": 8.104218465449119,
     "daily_sigma": 0.0047731341687232,
@@ -274,6 +287,7 @@
   },
   {
     "as_of": "2026-08-31",
+    "target_date": null,
     "forecast_rv": 6.370168800685922,
     "forecast_rv_single_har": 6.327043223446811,
     "daily_sigma": 0.0040128291562184,
@@ -295,6 +309,7 @@
   },
   {
     "as_of": "2026-09-01",
+    "target_date": "2026-09-02",
     "forecast_rv": 7.20544136656639,
     "forecast_rv_single_har": 7.515133519479265,
     "daily_sigma": 0.0045390014148552,
@@ -308,6 +323,28 @@
     "es99": 0.0238889812957079,
     "var95": 0.0103070865583258,
     "es95": 0.0152160260623171,
+    "trained_through": "2026-08-11",
+    "realized_rv": 5.951574051114748,
+    "realized_return": 0.004427088638159578,
+    "breach99": 0.0,
+    "breach95": 0.0
+  },
+  {
+    "as_of": "2026-09-02",
+    "target_date": null,
+    "forecast_rv": 6.942601250314923,
+    "forecast_rv_single_har": 6.980092833931609,
+    "daily_sigma": 0.004373427704814136,
+    "stress_index": 0.1970250235034825,
+    "regime": "Normal",
+    "p_calm": 0.4385883293190767,
+    "p_normal": 0.5318108196643951,
+    "p_stressed": 0.02953830220353229,
+    "p_panic": 6.254881299591618e-05,
+    "var99": 0.017333763097685872,
+    "es99": 0.023017558949531107,
+    "var95": 0.009931104617542185,
+    "es95": 0.01466097580853782,
     "trained_through": "2026-08-11",
     "realized_rv": null,
     "realized_return": null,
