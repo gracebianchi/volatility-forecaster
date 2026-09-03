@@ -98,19 +98,8 @@ def test_99_percent_var_exceeds_95_percent(forecaster, synthetic_market):
 
 
 def _history_row(as_of: str, **overrides) -> dict:
-    row = {c: np.nan for c in HISTORY_COLUMNS}
-    row.update(
-        {
-            "as_of": as_of,
-            "forecast_rv": 15.0,
-            "forecast_rv_single_har": 16.0,
-            "daily_sigma": 0.0094,
-            "stress_index": 0.3,
-            "regime": "Normal",
-            "var99": 0.03,
-            "var95": 0.02,
-        }
-    )
+    row = {c: (None if c == "target_date" else np.nan) for c in HISTORY_COLUMNS}
+    row.update({...})
     row.update(overrides)
     return row
 
@@ -125,6 +114,7 @@ def test_backfill_fills_the_following_session(synthetic_market):
 
     assert filled.loc[0, "realized_rv"] == pytest.approx(spy["realized_vol"].loc[target])
     assert filled.loc[0, "realized_return"] == pytest.approx(returns.loc[target])
+    assert filled.loc[0, "target_date"] == target.strftime("%Y-%m-%d")  
 
 
 def test_backfill_leaves_the_newest_forecast_unresolved(synthetic_market):

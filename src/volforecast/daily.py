@@ -46,7 +46,7 @@ HISTORY_COLUMNS = [
 
 
 # Everything in the history except these is a number.
-_TEXT_COLUMNS = ("as_of", "regime", "trained_through")
+_TEXT_COLUMNS = ("as_of", "target_date", "regime", "trained_through")
 
 
 def normalize(history: pd.DataFrame) -> pd.DataFrame:
@@ -100,6 +100,7 @@ def load_or_fit(
 def _row_from_forecast(fc: dict) -> dict:
     row = {
         "as_of": fc["as_of"],
+        "target_date": None,
         "forecast_rv": fc["forecast_rv"],
         "forecast_rv_single_har": fc["forecast_rv_single_har"],
         "daily_sigma": fc["daily_sigma"],
